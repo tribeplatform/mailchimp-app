@@ -3,7 +3,26 @@ import { NextFunction, Request, Response } from 'express';
 import { Types } from '@tribeplatform/gql-client';
 import { logger } from '@/utils/logger';
 
-const DEFAULT_SETTINGS = {}
+import { LiquidConvertor } from '@tribeplatform/slate-kit/convertors';
+
+const DEFAULT_SETTINGS = {};
+const SETTINGS_BLOCK = `
+<Form callbackId="save" defaultValues='{{settings}}'>
+  <Card>
+    <Card.Content className="space-y-3">
+      <Input
+        name="apiKey"
+        label="API Key"
+        placeholder="i.e. YXYXXYYYYYXXXYYYXXYYYYYXYYXXYXYY-usNN"
+        helperText="Don't know how to get API KEY? [Click here for instructions](https://mailchimp.com/developer/marketing/guides/quick-start/)"
+      />
+      <Button type="submit" variant="primary">
+        Save settings
+      </Button>
+    </Card.Content>
+  </Card>
+</Form>
+`;
 
 class WebhookController {
   public index = async (req: Request, res: Response, next: NextFunction) => {
@@ -23,6 +42,7 @@ class WebhookController {
         status: 'SUCCEEDED',
         data: {},
       };
+      console.log(JSON.stringify(input));
 
       switch (input.type) {
         case 'GET_SETTINGS':
@@ -30,6 +50,12 @@ class WebhookController {
           break;
         case 'UPDATE_SETTINGS':
           result = await this.updateSettings(input);
+          break;
+        case 'LOAD_BLOCK':
+          result = await this.loadBlock(input);
+          break;
+        case 'CALLBACK_BLOCK':
+          result = await this.handleCallback(input);
           break;
         case 'SUBSCRIPTION':
           result = await this.handleSubscription(input);
@@ -98,6 +124,66 @@ class WebhookController {
       type: input.type,
       status: 'SUCCEEDED',
       data: {},
+    };
+  }
+
+  /**
+   *
+   * @param input
+   * @returns { type: input.type, status: 'SUCCEEDED', data: {} }
+   * TODO: Elaborate on this function
+   */
+  private async loadBlock(input, customSettings = null) {
+    const {
+      data: { actorId, blockId },
+    } = input;
+    const settings = customSettings || DEFAULT_SETTINGS;
+    const convertor = new LiquidConvertor(SETTINGS_BLOCK);
+    const slate = await convertor.toSlate({
+      variables: { settings: JSON.stringify(settings) },
+    });
+    return {
+      type: input.type,
+      status: 'SUCCEEDED',
+      data: { slate },
+    };
+  }
+
+  /**
+   *
+   * @param input
+   * @returns { type: input.type, status: 'SUCCEEDED', data: {} }
+   * TODO: Elaborate on this function
+   */
+  private async handleCallback(input) {
+    const {
+      data: { callbackId, inputs = {} },
+    } = input;
+    let settings: any = {};
+    if (callbackId === 'save') {
+      let apiKey = inputs.apiKey;
+      if (!apiKey) {
+        return {
+          type: input.type,
+          status: 'FAILED',
+          errorCode: 'MISSING_PARAMETER',
+          errorMessage: `API Key cannot be empty.`,
+        };
+      }
+      settings.apiKey = apiKey;
+    }
+    const result = await this.loadBlock(input, settings);
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        action: 'REPLACE',
+        toast: {
+          title: 'Settings successfully updated.',
+          status: 'SUCCESS',
+        },
+        toStore: { settings },
+      },
     };
   }
 }
