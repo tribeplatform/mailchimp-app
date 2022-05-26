@@ -1,27 +1,29 @@
 import { NextFunction, Request, Response } from 'express';
 
-import { Types } from '@tribeplatform/gql-client';
+import { GlobalClient, Types } from '@tribeplatform/gql-client';
 import { logger } from '@/utils/logger';
 
 import { LiquidConvertor } from '@tribeplatform/slate-kit/convertors';
+import { CLIENT_ID, CLIENT_SECRET, GRAPHQL_URL, SERVER_URL } from '@/config';
+import auth from '@/utils/auth';
+import MailchimpModel from '@/models/mailchimp.model';
+// import mailchimp from '@mailchimp/mailchimp_marketing'
 
 const DEFAULT_SETTINGS = {};
 const SETTINGS_BLOCK = `
-<Form callbackId="save" defaultValues='{{settings}}'>
-  <Card>
-    <Card.Content className="space-y-3">
-      <Input
-        name="apiKey"
-        label="API Key"
-        placeholder="i.e. YXYXXYYYYYXXXYYYXXYYYYYXYYXXYXYY-usNN"
-        helperText="Don't know how to get API KEY? [Click here for instructions](https://mailchimp.com/developer/marketing/guides/quick-start/)"
-      />
-      <Button type="submit" variant="primary">
-        Save settings
+  {% if mailchimp != blank %}
+    <Iframe src="${SERVER_URL}/ui/settings?jwt={{jwt}}" title="Settings"></Iframe>
+  {% else %}
+    <Alert
+      status="warning"
+      title="You need to authenticate Mailchimp to activate this integration"
+    />
+    <Link href="${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp">
+      <Button variant="primary" className="my-5">
+        Connect Mailchimp
       </Button>
-    </Card.Content>
-  </Card>
-</Form>
+    </Link>
+  {% endif %}
 `;
 
 class WebhookController {
@@ -135,12 +137,20 @@ class WebhookController {
    */
   private async loadBlock(input, customSettings = null) {
     const {
+      networkId,
       data: { actorId, blockId },
     } = input;
     const settings = customSettings || DEFAULT_SETTINGS;
+    const tribeClient = await new GlobalClient({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      graphqlUrl: GRAPHQL_URL,
+    }).getTribeClient({ networkId });
+    const network = await tribeClient.network.get('basic');
     const convertor = new LiquidConvertor(SETTINGS_BLOCK);
+    const mailchimpConnection = await MailchimpModel.findOne({ networkId });
     const slate = await convertor.toSlate({
-      variables: { settings: JSON.stringify(settings) },
+      variables: { settings: JSON.stringify(settings), jwt: auth.sign({ networkId, memberId: actorId }), network, mailchimp: mailchimpConnection },
     });
     return {
       type: input.type,

@@ -13,6 +13,7 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import morgan from 'morgan';
 import path from 'path';
+import passportMiddleware from '@middlewares/passport.middleware';
 
 class App {
   public app: express.Application;
@@ -68,6 +69,7 @@ class App {
         },
       }),
     );
+    passportMiddleware.init(this.app)
     this.app.use(hpp());
     this.app.use(helmet());
     this.app.use(compression());

@@ -15,4 +15,7 @@ export const {
   LOG_FORMAT,
   LOG_DIR = '../logs',
   ORIGIN,
+  MAILCHIMP_CLIENT_ID,
+  MAILCHIMP_CLIENT_SECRET,
+  SERVER_URL
 } = process.env;
