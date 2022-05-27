@@ -25,9 +25,12 @@ const mailchimpSchema: Schema = new Schema({
     type: String,
     required: true,
   },
-  spaceId: {
+  audienceId: {
     type: String,
   },
+  segmentPrefix: {
+    type: String,
+  }
 });
 
 mailchimpSchema.index({ networkId: -1 });

@@ -7,23 +7,79 @@ import { LiquidConvertor } from '@tribeplatform/slate-kit/convertors';
 import { CLIENT_ID, CLIENT_SECRET, GRAPHQL_URL, SERVER_URL } from '@/config';
 import auth from '@/utils/auth';
 import MailchimpModel from '@/models/mailchimp.model';
-// import mailchimp from '@mailchimp/mailchimp_marketing'
+import MailchimpService from '@/services/mailchimp.services';
 
 const DEFAULT_SETTINGS = {};
 const SETTINGS_BLOCK = `
-  {% if mailchimp != blank %}
-    <Iframe src="${SERVER_URL}/ui/settings?jwt={{jwt}}" title="Settings"></Iframe>
-  {% else %}
-    <Alert
-      status="warning"
-      title="You need to authenticate Mailchimp to activate this integration"
-    />
-    <Link href="${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp">
-      <Button variant="primary" className="my-5">
-        Connect Mailchimp
-      </Button>
-    </Link>
+{% capture audienceItems %}
+[
+  {% if lists %}
+    {% for list in lists %}
+      { 
+        "text":"{{list.name}}",
+        "value":"{{list.id}}"
+      }
+      {% if forloop.last == false%},{% endif %}
+    {% endfor %}
   {% endif %}
+]
+{% endcapture %}
+{%- assign connectUrl = "${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp" -%}
+{% if mailchimp != blank and mailchimp.audienceId == blank %}
+  {%- assign callbackId = "save-audience" -%}
+{% else %}
+  {%- assign callbackId = "save" -%}
+{% endif %}
+<Form callbackId="{{callbackId}}">
+  <Card>
+    <Card.Content>
+      {% if mailchimp != blank %}
+        {% if mailchimp.audienceId == blank %}
+          <Alert
+            status="info"
+            title="Attention needed"
+          >
+            You need to choose Audience from the list below to finish the setup.
+          </Alert>
+          {% if lists  %}
+            <Select
+              name="audienceId"
+              label="Audience"
+              items='{{audienceItems}}'
+            />
+          {% endif %}
+          <Input
+            name="segmentsPrefix"
+            label="Tags Prefix"
+            value="Community"
+            placeholder="i.e. Community"
+            helperText="The prefix helps you would be added to the tag name for each space."
+          />
+          <Button type="submit" variant="primary">
+            Submit
+          </Button>
+        {% else %}
+          <Alert
+            status="success"
+            title="Setup completed"
+          >
+            You have successfully connected your community to {{mailchimp.name}}
+          </Alert>
+        {% endif %}
+      {% else %}
+        <Alert
+          status="warning"
+          title="You need to authenticate Mailchimp to activate this integration"
+        />
+        <Link href="{{connectUrl}}">
+          <Button variant="primary" className="my-5">
+            Connect Mailchimp
+          </Button>
+        </Link>
+      {% endif %}
+    </Card.Content>
+  </Card>
+</Form>
 `;
 
 class WebhookController {
@@ -122,6 +178,25 @@ class WebhookController {
    * TODO: Elaborate on this function
    */
   private async handleSubscription(input) {
+    const { networkId } = input;
+    const tribeClient = await new GlobalClient({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      graphqlUrl: GRAPHQL_URL,
+    }).getTribeClient({ networkId });
+    const network = await tribeClient.network.get('basic');
+    const mailchimpConnection = await MailchimpModel.findOne({ networkId });
+    if (!mailchimpConnection || !mailchimpConnection.audienceId) {
+      return {
+        type: input.type,
+        status: 'SUCCEEDED',
+        data: {},
+      };
+    }
+    switch (input.type) {
+      case 'member.verified':
+        break;
+    }
     return {
       type: input.type,
       status: 'SUCCEEDED',
@@ -149,8 +224,23 @@ class WebhookController {
     const network = await tribeClient.network.get('basic');
     const convertor = new LiquidConvertor(SETTINGS_BLOCK);
     const mailchimpConnection = await MailchimpModel.findOne({ networkId });
+    let variables = {
+      settings: JSON.stringify(settings),
+      jwt: auth.sign({ networkId, memberId: actorId }),
+      network,
+      mailchimp: mailchimpConnection,
+    } as any;
+    if (mailchimpConnection) {
+      const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
+      try {
+        const { lists } = await mailchimpService.lists.list();
+        variables.lists = lists;
+      } catch (error) {
+        console.log(error);
+      }
+    }
     const slate = await convertor.toSlate({
-      variables: { settings: JSON.stringify(settings), jwt: auth.sign({ networkId, memberId: actorId }), network, mailchimp: mailchimpConnection },
+      variables,
     });
     return {
       type: input.type,
@@ -167,34 +257,33 @@ class WebhookController {
    */
   private async handleCallback(input) {
     const {
+      networkId,
       data: { callbackId, inputs = {} },
     } = input;
+    console.log(JSON.stringify(input))
     let settings: any = {};
-    if (callbackId === 'save') {
-      let apiKey = inputs.apiKey;
-      if (!apiKey) {
-        return {
-          type: input.type,
-          status: 'FAILED',
-          errorCode: 'MISSING_PARAMETER',
-          errorMessage: `API Key cannot be empty.`,
-        };
-      }
-      settings.apiKey = apiKey;
+    if (callbackId === 'save-audience') {
+      let { audienceId, segmentPrefix } = inputs;
+      const mailchimpConnection = await MailchimpModel.findOne({ networkId });
+      mailchimpConnection.audienceId = audienceId
+      mailchimpConnection.segmentPrefix = segmentPrefix
+      await mailchimpConnection.save()
+      const result = await this.loadBlock(input, settings);
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          action: 'REPLACE',
+          toast: {
+            title: 'Mailchimp has successfully been setup.',
+            status: 'SUCCESS',
+          },
+          toStore: { settings },
+        },
+      };
     }
     const result = await this.loadBlock(input, settings);
-    return {
-      ...result,
-      data: {
-        ...result.data,
-        action: 'REPLACE',
-        toast: {
-          title: 'Settings successfully updated.',
-          status: 'SUCCESS',
-        },
-        toStore: { settings },
-      },
-    };
+    return result
   }
 }
 

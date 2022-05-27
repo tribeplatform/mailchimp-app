@@ -1,10 +1,11 @@
-import { MAILCHIMP_CLIENT_ID, MAILCHIMP_CLIENT_SECRET, SERVER_URL } from '@config';
+import { CLIENT_ID, CLIENT_SECRET, GRAPHQL_URL, MAILCHIMP_CLIENT_ID, MAILCHIMP_CLIENT_SECRET, SERVER_URL } from '@config';
 
 import passport from 'passport';
 import express from 'express';
 import { logger } from '@/utils/logger';
 import { Strategy as MailchimpStrategy } from 'passport-mailchimp';
 import MailchimpModel from '@/models/mailchimp.model';
+import { GlobalClient } from '@tribeplatform/gql-client';
 const init = (app: express.Application) => {
   passport.use(
     new MailchimpStrategy(

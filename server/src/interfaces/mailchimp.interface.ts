@@ -5,4 +5,6 @@ export interface Mailchimp {
   accessToken: string;
   dataCentre: string;
   apiEndpoint: string;
+  audienceId: string;
+  segmentPrefix: string;
 }
