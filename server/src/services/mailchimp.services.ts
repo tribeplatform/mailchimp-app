@@ -27,8 +27,10 @@ class MailchimpService {
       })
       .then(data => data.data);
   }
-  public list(id: string) {
-    return new TagsService(id, this.request);
+  public list(id: string): ListsService & { tags: TagsService } {
+    const listService = new ListsService(this.request.bind(this), id) as ListsService & { tags: TagsService };
+    listService.tags = new TagsService(id, this.request.bind(this));
+    return listService;
   }
 }
 

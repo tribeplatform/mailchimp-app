@@ -8,6 +8,9 @@ import { CLIENT_ID, CLIENT_SECRET, GRAPHQL_URL, SERVER_URL } from '@/config';
 import auth from '@/utils/auth';
 import MailchimpModel from '@/models/mailchimp.model';
 import MailchimpService from '@/services/mailchimp.services';
+import SegmentModel from '@/models/segments.model';
+import { Member, Space, SpaceMember } from '@tribeplatform/gql-client/types';
+import { Mailchimp } from '@/interfaces/mailchimp.interface';
 
 const DEFAULT_SETTINGS = {};
 const SETTINGS_BLOCK = `
@@ -24,7 +27,9 @@ const SETTINGS_BLOCK = `
   {% endif %}
 ]
 {% endcapture %}
-{%- assign connectUrl = "${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp" -%}
+{% capture connectUrl %}
+  ${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp
+{% endcapture %}
 {% if mailchimp != blank and mailchimp.audienceId == blank %}
   {%- assign callbackId = "save-audience" -%}
 {% else %}
@@ -49,7 +54,7 @@ const SETTINGS_BLOCK = `
             />
           {% endif %}
           <Input
-            name="segmentsPrefix"
+            name="segmentPrefix"
             label="Tags Prefix"
             value="Community"
             placeholder="i.e. Community"
@@ -118,6 +123,9 @@ class WebhookController {
         case 'SUBSCRIPTION':
           result = await this.handleSubscription(input);
           break;
+        case 'APP_UNINSTALLED':
+          result = await this.removeNetworkSettings(input);
+          break;
       }
       res.status(200).json(result);
     } catch (error) {
@@ -178,14 +186,16 @@ class WebhookController {
    * TODO: Elaborate on this function
    */
   private async handleSubscription(input) {
-    const { networkId } = input;
+    const {
+      networkId,
+      data: { object },
+    } = input;
     const tribeClient = await new GlobalClient({
       clientId: CLIENT_ID,
       clientSecret: CLIENT_SECRET,
       graphqlUrl: GRAPHQL_URL,
     }).getTribeClient({ networkId });
-    const network = await tribeClient.network.get('basic');
-    const mailchimpConnection = await MailchimpModel.findOne({ networkId });
+    const mailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
     if (!mailchimpConnection || !mailchimpConnection.audienceId) {
       return {
         type: input.type,
@@ -193,15 +203,79 @@ class WebhookController {
         data: {},
       };
     }
-    switch (input.type) {
-      case 'member.verified':
-        break;
+    const audienceId = mailchimpConnection.audienceId;
+    const segmentPrefix = mailchimpConnection.segmentPrefix;
+    const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
+    let segment;
+    try {
+      switch (input?.data?.name) {
+        case 'member.verified':
+          await mailchimpService.list(audienceId).addMember(object);
+          break;
+        case 'space.updated':
+        case 'space.created':
+          segment = await this.getSegment(mailchimpService, { networkId, spaceId: (object as Space).id, audienceId });
+          if (!segment) {
+            const result = await mailchimpService.list(audienceId).tags.create({ name: segmentPrefix + ' ' + object.name });
+            await SegmentModel.create({ networkId, spaceId: (object as Space).id, segmentId: result.id });
+          } else {
+            await mailchimpService.list(audienceId).tags.update(segment.id, { name: segmentPrefix + ' ' + object.name });
+          }
+          break;
+        case 'space_membership.created':
+        case 'space_membership.deleted':
+          segment = await this.getSegment(mailchimpService, { networkId, spaceId: object.spaceId, audienceId });
+          if (!segment) {
+            const space = await tribeClient.spaces.get({ id: object.spaceId }, 'basic');
+            segment = await mailchimpService.list(audienceId).tags.create({ name: segmentPrefix + ' ' + space.name });
+            await SegmentModel.create({ networkId, spaceId: space.id, segmentId: segment.id });
+          }
+          const tribeMember = await tribeClient.members.get({ id: object.memberId }, 'basic');
+          const mailchimpMember = await this.getMember(mailchimpService, { email: tribeMember.email, audienceId });
+          if (!mailchimpMember) await mailchimpService.list(audienceId).addMember({ name: tribeMember.name, email: tribeMember.email });
+          if (input?.data?.name === 'space_membership.created') {
+            await mailchimpService.list(audienceId).tags.addMembers(segment.id, [tribeMember.email]);
+          } else {
+            await mailchimpService.list(audienceId).tags.removeMembers(segment.id, [tribeMember.email]);
+          }
+          break;
+      }
+    } catch (err) {
+      console.log(err);
+      return {
+        type: input.type,
+        status: 'FALIED',
+        data: {},
+      };
     }
+
     return {
       type: input.type,
       status: 'SUCCEEDED',
       data: {},
     };
+  }
+
+  private async getSegment(
+    mailchimpService: MailchimpService,
+    { networkId, spaceId, audienceId }: { networkId: string; spaceId: string; audienceId: string },
+  ) {
+    let segment = await SegmentModel.findOne({ networkId, spaceId }).lean();
+    if (segment?.segmentId) {
+      try {
+        segment = await mailchimpService.list(audienceId).tags.get(segment.segmentId);
+      } catch (err) {
+        segment = null;
+      }
+    }
+    return segment;
+  }
+  private async getMember(mailchimpService: MailchimpService, { email, audienceId }: { email: string; audienceId: string }) {
+    try {
+      return await mailchimpService.list(audienceId).getMember({ email });
+    } catch (err) {
+      return null;
+    }
   }
 
   /**
@@ -260,14 +334,14 @@ class WebhookController {
       networkId,
       data: { callbackId, inputs = {} },
     } = input;
-    console.log(JSON.stringify(input))
+    console.log(JSON.stringify(input));
     let settings: any = {};
     if (callbackId === 'save-audience') {
       let { audienceId, segmentPrefix } = inputs;
       const mailchimpConnection = await MailchimpModel.findOne({ networkId });
-      mailchimpConnection.audienceId = audienceId
-      mailchimpConnection.segmentPrefix = segmentPrefix
-      await mailchimpConnection.save()
+      mailchimpConnection.audienceId = audienceId;
+      mailchimpConnection.segmentPrefix = segmentPrefix;
+      await mailchimpConnection.save();
       const result = await this.loadBlock(input, settings);
       return {
         ...result,
@@ -283,7 +357,22 @@ class WebhookController {
       };
     }
     const result = await this.loadBlock(input, settings);
-    return result
+    return result;
+  }
+  /**
+   *
+   * @param input
+   * @returns { type: input.type, status: 'SUCCEEDED', data: {} }
+   * TODO: Elaborate on this function
+   */
+  private async removeNetworkSettings(input) {
+    const { networkId } = input;
+    await MailchimpModel.deleteOne({ networkId });
+    await SegmentModel.deleteMany({ networkId });
+    return {
+      type: input.type,
+      status: 'SUCCEEDED',
+    };
   }
 }
 

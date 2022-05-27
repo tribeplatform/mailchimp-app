@@ -1,4 +1,4 @@
-import { RequestParam } from "../mailchimp.services";
+import { RequestParam } from '../mailchimp.services';
 
 class TagsService {
   list: string;
@@ -7,7 +7,13 @@ class TagsService {
     this.list = list;
     this.request = request;
   }
-  public async create(name: string) {
+public get(id: string) {
+    return this.request({
+      method: 'GET',
+      url: `/lists/${this.list}/segments/${id}`,
+    });
+  }
+  public async create({ name }: { name: string }) {
     return this.request({
       method: 'POST',
       url: `/lists/${this.list}/segments`,
