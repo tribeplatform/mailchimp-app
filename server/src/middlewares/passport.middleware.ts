@@ -21,14 +21,21 @@ const init = (app: express.Application) => {
           let buff = Buffer.from(String(req.query.state), 'base64');
           const { n: networkId, m: memberId } = JSON.parse(buff.toString('ascii')) as { n: string; m: string; s: string };
           const { _json } = profile;
-          const mailchimp = await MailchimpModel.create({
-            name: _json.accountname,
-            connectedBy: memberId,
-            networkId,
-            accessToken,
-            dataCentre: _json.dc,
-            apiEndpoint: _json.api_endpoint,
-          });
+          const mailchimp = await MailchimpModel.findOneAndReplace(
+            { networkId },
+            {
+              name: _json.accountname,
+              connectedBy: memberId,
+              networkId,
+              accessToken,
+              dataCentre: _json.dc,
+              apiEndpoint: _json.api_endpoint,
+            },
+            {
+              upsert: true,
+              returnDocument: 'after',
+            },
+          );
           done(null, mailchimp);
         } catch (err) {
           logger.error('An error occured during the SlackStrategy handling');

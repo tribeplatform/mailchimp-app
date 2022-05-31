@@ -1,3 +1,6 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 /**
  * @method isEmpty
  * @param {String | Number | Object} value
@@ -17,3 +20,5 @@ export const isEmpty = (value: string | number | object): boolean => {
     return false;
   }
 };
+
+export const formatDateForMailchimp = (date: string): string => dayjs(date).utc().format('YYYY-MM-DDTHH:mm:ss') + '+00:00';
