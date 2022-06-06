@@ -27,9 +27,7 @@ const SETTINGS_BLOCK = `
   {% endif %}
 ]
 {% endcapture %}
-{% capture connectUrl %}
-  ${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp
-{% endcapture %}
+{% capture connectUrl %}${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp{% endcapture %}
 {% if mailchimp != blank and mailchimp.audienceId == blank %}
   {%- assign callbackId = "save-audience" -%}
 {% else %}
@@ -40,61 +38,66 @@ const SETTINGS_BLOCK = `
     <Card.Content>
       {% if mailchimp != blank %}
         {% if mailchimp.audienceId == blank %}
-          <Alert
-            status="info"
-            title="Attention needed"
-          >
-            You need to choose Audience from the list below to finish the setup.
-          </Alert>
-          {% if lists  %}
-            <Select
-              value='{{audienceItems[0].value}}'
+          <List spacing="md">
+            <Alert
+              status="info"
+              title="Attention needed">
+              You need to choose Audience from the list below to finish the setup.
+            </Alert>
+            {% if lists  %}
+              <Select
+                value='{{audienceItems[0].value}}'
+                name="audienceId"
+                label="Audience"
+                items='{{audienceItems}}'
+              />
+            {% endif %}
+            <Input
+              name="segmentPrefix"
+              label="Tags Prefix"
+              value="Community"
+              placeholder="i.e. Community"
+              helperText="The prefix helps you would be added to the tag name for each space."
+            />
+            <Button type="submit" variant="primary">
+              Submit
+            </Button>
+          </List>
+        {% else %}
+          <List spacing="sm">
+            <Alert
+              status="success"
+              title="Setup completed"
+            >
+              You have successfully connected your community to {{mailchimp.name}}
+            </Alert>
+            <Input
+              disabled="true"
               name="audienceId"
               label="Audience"
-              items='{{audienceItems}}'
+              value="{{audienceName}}"
             />
-          {% endif %}
-          <Input
-            className="my-5"
-            name="segmentPrefix"
-            label="Tags Prefix"
-            value="Community"
-            placeholder="i.e. Community"
-            helperText="The prefix helps you would be added to the tag name for each space."
-          />
-          <Button type="submit" variant="primary">
-            Submit
-          </Button>
-        {% else %}
-          <Alert
-            status="success"
-            title="Setup completed"
-          >
-            You have successfully connected your community to {{mailchimp.name}}
-          </Alert>
-          <Input
-            disabled="true"
-            name="audienceId"
-            label="Audience"
-            value="{{audienceName}}"
-          />
-          <Input
-            disabled="true"
-            name="segmentPrefix"
-            label="Tags Prefix"
-            value="Community"
-          />
+            <Input
+              disabled="true"
+              name="segmentPrefix"
+              label="Tags Prefix"
+              value="Community"
+            />
+            <Button as="a" href="{{connectUrl}}" className="pointer-events-auto">
+              Reconnect
+            </Button>
+          </List>
         {% endif %}
       {% else %}
-        <Alert
-          status="warning"
-          title="You need to authenticate Mailchimp to activate this integration"
-        />
-        <Link href="{{connectUrl}}">
-          <Button variant="primary" className="my-5">
-            Connect Mailchimp
-          </Button>
-        </Link>
+        <List spacing="sm">
+           <Alert
+            status="warning"
+            title="You need to authenticate Mailchimp to activate this integration"
+            />
+            <Button as="a" href="{{connectUrl}}" variant="primary" className="pointer-events-auto">
+              Connect Mailchimp
+            </Button>
+        </List>
       {% endif %}
     </Card.Content>
   </Card>
