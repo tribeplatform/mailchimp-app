@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 
-import { GlobalClient, Types } from '@tribeplatform/gql-client';
+import { GlobalClient, TribeClient, Types } from '@tribeplatform/gql-client';
 import { logger } from '@/utils/logger';
 
 import { LiquidConvertor } from '@tribeplatform/slate-kit/convertors';
@@ -9,8 +9,9 @@ import auth from '@/utils/auth';
 import MailchimpModel from '@/models/mailchimp.model';
 import MailchimpService from '@/services/mailchimp.services';
 import SegmentModel from '@/models/segments.model';
-import { Space } from '@tribeplatform/gql-client/types';
+import { Member, Space } from '@tribeplatform/gql-client/types';
 import { formatDateForMailchimp } from '@utils/util';
+import { Mailchimp as MailchimpConnection } from '@/interfaces/mailchimp.interface';
 
 const DEFAULT_SETTINGS = {};
 const SETTINGS_BLOCK = `
@@ -27,13 +28,16 @@ const SETTINGS_BLOCK = `
   {% endif %}
 ]
 {% endcapture %}
+
 {% capture connectUrl %}${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp{% endcapture %}
+
 {% if mailchimp != blank and mailchimp.audienceId == blank %}
   {%- assign callbackId = "save-audience" -%}
 {% else %}
   {%- assign callbackId = "save" -%}
 {% endif %}
-<Form callbackId="{{callbackId}}">
+
+<Form callbackId="{{callbackId}}" defaultValues='{{settings}}'>
   <Card>
     <Card.Content>
       {% if mailchimp != blank %}
@@ -57,7 +61,26 @@ const SETTINGS_BLOCK = `
               label="Tags Prefix"
               value="Community"
               placeholder="i.e. Community"
-              helperText="The prefix helps you would be added to the tag name for each space."
+              helperText="Space names are added as tags to contacts. The prefix helps you identify the tags added from the community"
+            />
+            <Input
+              name="segmentPrefix"
+              label="Tags Prefix"
+              value="Community"
+              placeholder="i.e. Community"
+              helperText="Space names are added as tags to contacts. The prefix helps you identify the tags added from the community"
+            />
+            <Toggle
+              name="sendName"
+              label="Always update Mailchimp contact name and last name"
+              value=true
+              helperText="By default, Tribe only updates Mailchimp contact name if it doesn’t have any value."
+            />
+            <Toggle
+              name="sendEvents"
+              label="Send events"
+              value=true
+              helperText="Send community events to Mailchimp"
             />
             <Button type="submit" variant="primary">
               Submit
@@ -69,11 +92,16 @@ const SETTINGS_BLOCK = `
               status="success"
               title="Setup completed"
             >
-              You have successfully connected your community to {{mailchimp.name}}
+              <List spacing="sm">
+                You have successfully connected your community to {{mailchimp.name}}
+                <Link href="#" variant="inherit" href="{{connectUrl}}">
+                  Reconnect
+                </Link>
+              </List>
             </Alert>
             <Input
               disabled="true"
-              name="audienceId"
+              name="audienceName"
               label="Audience"
               value="{{audienceName}}"
             />
@@ -81,10 +109,20 @@ const SETTINGS_BLOCK = `
               disabled="true"
               name="segmentPrefix"
               label="Tags Prefix"
-              value="Community"
+              helperText="Space names are added as tags to contacts. The prefix helps you identify the tags added from the community"
             />
-            <Button as="a" href="{{connectUrl}}" className="pointer-events-auto">
-              Reconnect
+            <Toggle
+              name="sendName"
+              label="Always update Mailchimp contact name and last name"
+              helperText="By default, Tribe only updates Mailchimp contact name if it doesn’t have any value."
+            />
+            <Toggle
+              name="sendEvents"
+              label="Send events"
+              helperText="Send community events to Mailchimp"
+            />
+            <Button type="submit" variant="primary">
+              Submit
             </Button>
           </List>
         {% endif %}
@@ -212,7 +250,7 @@ class WebhookController {
       clientSecret: CLIENT_SECRET,
       graphqlUrl: GRAPHQL_URL,
     }).getTribeClient({ networkId });
-    const mailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
+    const mailchimpConnection: MailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
     if (!mailchimpConnection || !mailchimpConnection.audienceId) {
       return {
         type: input.type,
@@ -223,18 +261,13 @@ class WebhookController {
     const audienceId = mailchimpConnection.audienceId;
     const segmentPrefix = mailchimpConnection.segmentPrefix;
     const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
-    let segment, member;
+    let segment;
     const data = input?.data || {};
     try {
       switch (input?.data?.name) {
         case 'member.verified':
         case 'member.updated':
-          member = await this.getMember(mailchimpService, { email: object.email, audienceId });
-          if (!member) {
-            await mailchimpService.list(audienceId).addMember(object);
-          } else {
-            await mailchimpService.list(audienceId).updateMember(object);
-          }
+          await this.addOrUpdateMember(object as Member, audienceId, mailchimpService, mailchimpConnection);
           break;
         case 'space.updated':
         case 'space.created':
@@ -264,23 +297,8 @@ class WebhookController {
           }
           break;
       }
-
-      const eventsList = ['space_membership.created', 'space_membership.deleted', 'space.created', 'post.published', 'reaction.added', 'tag.added'];
-      const { shortDescription, actor, time } = data as { shortDescription: string; actor: Types.Member; time: string };
-      if (shortDescription && actor.id && eventsList.indexOf(input?.data?.name) !== -1) {
-        member = (await tribeClient.members.get({ id: actor?.id }, 'basic')) as Types.Member;
-        let mailchimpMember = await this.getMember(mailchimpService, { email: member?.email, audienceId });
-        if (!mailchimpMember) {
-          await mailchimpService.list(audienceId).addMember(member);
-        } else {
-          await mailchimpService.list(audienceId).updateMember(member);
-        }
-        await mailchimpService.list(audienceId).addEvent({
-          name: shortDescription,
-          date: time,
-          email: member?.email,
-          properties: this.createEventProperties(data),
-        });
+      if (mailchimpConnection.sendEvents) {
+        await this.sendEvent(input?.data?.name, data, audienceId, tribeClient, mailchimpService, mailchimpConnection);
       }
     } catch (err) {
       console.log(err);
@@ -300,6 +318,35 @@ class WebhookController {
   private createSegmentIfNotExist = ({ networkId, spaceId, segmentId }: { networkId: string; spaceId: string; segmentId: string }) =>
     SegmentModel.findOneAndReplace({ networkId, spaceId }, { networkId, spaceId, segmentId }, { upsert: true });
 
+  private async sendEvent(
+    event: string,
+    data: any,
+    audienceId: string,
+    tribeClient: TribeClient,
+    mailchimpService: MailchimpService,
+    mailchimpConnection: MailchimpConnection,
+  ) {
+    const eventsList = ['space_membership.created', 'space_membership.deleted', 'space.created', 'post.published', 'reaction.added', 'tag.added'];
+    const { shortDescription, actor, time } = data as { shortDescription: string; actor: Types.Member; time: string };
+    if (shortDescription && actor.id && eventsList.indexOf(event) !== -1) {
+      let member = (await tribeClient.members.get({ id: actor?.id }, 'basic')) as Types.Member;
+      await this.addOrUpdateMember(member, audienceId, mailchimpService, mailchimpConnection);
+      await mailchimpService.list(audienceId).addEvent({
+        name: shortDescription,
+        date: time,
+        email: member?.email,
+        properties: this.createEventProperties(data),
+      });
+    }
+  }
+  private async addOrUpdateMember(member: Member, audienceId: string, mailchimpService: MailchimpService, mailchimpConnection: MailchimpConnection) {
+    let mailchimpMember = await this.getMember(mailchimpService, { email: member?.email, audienceId });
+    if (!mailchimpMember) {
+      await mailchimpService.list(audienceId).addMember(member as any);
+    } else if (mailchimpConnection.sendName) {
+      await mailchimpService.list(audienceId).updateMember(member as any);
+    }
+  }
   private createEventProperties(data): any {
     if (!data?.object?.id) return {};
     const fields = [
@@ -373,9 +420,9 @@ class WebhookController {
     }).getTribeClient({ networkId });
     const network = await tribeClient.network.get('basic');
     const convertor = new LiquidConvertor(SETTINGS_BLOCK);
-    const mailchimpConnection = await MailchimpModel.findOne({ networkId });
+    const mailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
     let variables = {
-      settings: JSON.stringify(settings),
+      settings: JSON.stringify({}),
       jwt: auth.sign({ networkId, memberId: actorId }),
       network,
       mailchimp: mailchimpConnection,
@@ -391,10 +438,15 @@ class WebhookController {
             variables.audienceName = audienceName.name;
           }
         }
+        variables.settings = JSON.stringify({
+          ...mailchimpConnection,
+          audienceName: variables.audienceName,
+        });
       } catch (error) {
         console.log(error);
       }
     }
+
     const slate = await convertor.toSlate({
       variables,
     });
@@ -417,20 +469,23 @@ class WebhookController {
       data: { callbackId, inputs = {} },
     } = input;
     let settings: any = {};
-    if (callbackId === 'save-audience') {
-      let { audienceId, segmentPrefix } = inputs;
+    if (['save-audience', 'save'].indexOf(callbackId) !== -1) {
       const mailchimpConnection = await MailchimpModel.findOne({ networkId });
-      mailchimpConnection.audienceId = audienceId;
-      mailchimpConnection.segmentPrefix = segmentPrefix;
+      let fields = ['audienceId', 'segmentPrefix', 'sendName', 'sendEvents'];
+      fields.forEach(field => {
+        if (typeof inputs[field] !== 'undefined') mailchimpConnection[field] = inputs[field];
+      });
       await mailchimpConnection.save();
       const result = await this.loadBlock(input, settings);
+      const toastMessage =
+        callbackId === 'save-audience' ? 'Mailchimp has successfully been setup.' : 'Mailchimp connection has been successfully updated.';
       return {
         ...result,
         data: {
           ...result.data,
           action: 'REPLACE',
           toast: {
-            title: 'Mailchimp has successfully been setup.',
+            title: toastMessage,
             status: 'SUCCESS',
           },
           toStore: { settings },
@@ -438,7 +493,14 @@ class WebhookController {
       };
     }
     const result = await this.loadBlock(input, settings);
-    return result;
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        action: 'REPLACE',
+        toStore: { settings },
+      },
+    };
   }
   /**
    *

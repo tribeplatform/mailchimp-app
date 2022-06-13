@@ -7,4 +7,6 @@ export interface Mailchimp {
   apiEndpoint: string;
   audienceId: string;
   segmentPrefix: string;
+  sendEvents: boolean;
+  sendName: boolean;
 }

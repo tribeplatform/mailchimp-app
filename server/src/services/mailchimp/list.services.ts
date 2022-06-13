@@ -23,6 +23,7 @@ class ListsService {
         status: 'subscribed',
         merge_fields: {
           FNAME: name.split(' ')[0],
+          LNAME: name.split(' ').slice(1).join(' ')
         },
       },
     });
@@ -35,6 +36,7 @@ class ListsService {
         status_if_new: 'subscribed',
         merge_fields: {
           FNAME: name.split(' ')[0],
+          LNAME: name.split(' ').slice(1).join(' ')
         },
       },
     });

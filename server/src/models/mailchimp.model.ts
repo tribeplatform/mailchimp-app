@@ -30,7 +30,15 @@ const mailchimpSchema: Schema = new Schema({
   },
   segmentPrefix: {
     type: String,
-  }
+  },
+  sendEvents: {
+    type: Boolean,
+    default: true,
+  },
+  sendName: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 mailchimpSchema.index({ networkId: -1 });
