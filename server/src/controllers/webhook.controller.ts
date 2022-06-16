@@ -63,13 +63,6 @@ const SETTINGS_BLOCK = `
               placeholder="i.e. Community"
               helperText="Space names are added as tags to contacts. The prefix helps you identify the tags added from the community"
             />
-            <Input
-              name="segmentPrefix"
-              label="Tags Prefix"
-              value="Community"
-              placeholder="i.e. Community"
-              helperText="Space names are added as tags to contacts. The prefix helps you identify the tags added from the community"
-            />
             <Toggle
               name="sendName"
               label="Always update Mailchimp contact name and last name"
