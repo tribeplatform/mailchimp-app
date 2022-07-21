@@ -166,6 +166,7 @@ class WebhookController {
           result = await this.loadBlock(input);
           break;
         case 'CALLBACK_BLOCK':
+        case 'Callback':
           result = await this.handleCallback(input);
           break;
         case 'SUBSCRIPTION':
