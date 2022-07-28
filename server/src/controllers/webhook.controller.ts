@@ -289,6 +289,16 @@ class WebhookController {
           } else {
             await mailchimpService.list(audienceId).tags.removeMembers(segment.id, [tribeMember.email]);
           }
+          const spaces = await tribeClient.spaceMembers.listSpaces({ memberId: object.memberId, limit: 10 }, 'basic');
+          for (let spaceMember of spaces.nodes) {
+            const spaceId = spaceMember.space.id
+            segment = await this.getSegment(mailchimpService, { networkId, spaceId, audienceId });
+            if (!segment) {
+              segment = await mailchimpService.list(audienceId).tags.create({ name: segmentPrefix + ' ' + spaceMember.space.name });
+              await this.createSegmentIfNotExist({ networkId, spaceId, segmentId: segment.id });
+            }
+            await mailchimpService.list(audienceId).tags.addMembers(segment.id, [tribeMember.email]);
+          }
           break;
       }
       if (mailchimpConnection.sendEvents) {
