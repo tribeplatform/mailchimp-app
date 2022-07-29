@@ -290,15 +290,21 @@ class WebhookController {
             await mailchimpService.list(audienceId).tags.removeMembers(segment.id, [tribeMember.email]);
           }
           const spaces = await tribeClient.spaceMembers.listSpaces({ memberId: object.memberId, limit: 10 }, 'basic');
-          spaces?.edges?.forEach(async ({ node }) => {
-            const spaceId = node?.space?.id;
-            segment = await this.getSegment(mailchimpService, { networkId, spaceId, audienceId });
-            if (!segment) {
-              segment = await mailchimpService.list(audienceId).tags.create({ name: segmentPrefix + ' ' + node.space.name });
-              await this.createSegmentIfNotExist({ networkId, spaceId, segmentId: segment.id });
+          try {
+            for (let edge of spaces?.edges) {
+              const spaceId = edge?.node?.space?.id;
+              segment = await this.getSegment(mailchimpService, { networkId, spaceId, audienceId });
+              if (!segment && edge?.node?.space?.name) {
+                segment = await mailchimpService.list(audienceId).tags.create({ name: segmentPrefix + ' ' + edge?.node?.space.name });
+                await this.createSegmentIfNotExist({ networkId, spaceId, segmentId: segment.id });
+              }
+              if (segment) {
+                await mailchimpService.list(audienceId).tags.addMembers(segment.id, [tribeMember.email]);
+              }
             }
-            await mailchimpService.list(audienceId).tags.addMembers(segment.id, [tribeMember.email]);
-          });
+          } catch (err) {
+            console.error(err)
+          }
           break;
       }
       if (mailchimpConnection.sendEvents) {
