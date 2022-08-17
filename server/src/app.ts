@@ -56,7 +56,6 @@ class App {
     if (dbConnection) {
       try {
         await connect(dbConnection.url, dbConnection.options);
-        logger.log('asdasd');
       } catch (error) {
         logger.error(error);
       }
