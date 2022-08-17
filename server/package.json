@@ -15,6 +15,7 @@
   "dependencies": {
     "@mailchimp/mailchimp_marketing": "^3.0.75",
     "@tribeplatform/gql-client": "^1.1.2",
+    "@tribeplatform/node-logger": "^1.0.0",
     "@tribeplatform/slate-kit": "^1.0.7",
     "@types/passport": "^1.0.7",
     "@types/react": "^18.0.3",
