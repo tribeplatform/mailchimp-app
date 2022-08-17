@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
 import { GlobalClient, TribeClient, Types } from '@tribeplatform/gql-client';
-import { logger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
 
 import { LiquidConvertor } from '@tribeplatform/slate-kit/convertors';
 import { CLIENT_ID, CLIENT_SECRET, GRAPHQL_URL, SERVER_URL } from '@/config';
@@ -12,6 +12,8 @@ import SegmentModel from '@/models/segments.model';
 import { Member, Space } from '@tribeplatform/gql-client/types';
 import { formatDateForMailchimp } from '@utils/util';
 import { Mailchimp as MailchimpConnection } from '@/interfaces/mailchimp.interface';
+
+const logger  = createLogger('WebhookController')
 
 const DEFAULT_SETTINGS = {};
 const SETTINGS_BLOCK = `
@@ -153,7 +155,7 @@ class WebhookController {
         status: 'SUCCEEDED',
         data: {},
       };
-      console.log(JSON.stringify(input));
+      logger.log(JSON.stringify(input));
 
       switch (input.type) {
         case 'GET_SETTINGS':
@@ -309,7 +311,7 @@ class WebhookController {
                 }
               }
             } catch (err) {
-              console.error(err);
+              logger.error(err);
             }
           }
           break;
@@ -318,7 +320,7 @@ class WebhookController {
         await this.sendEvent(input?.data?.name, data, audienceId, tribeClient, mailchimpService, mailchimpConnection);
       }
     } catch (err) {
-      console.log(err);
+      logger.log(err);
       return {
         type: input.type,
         status: 'FALIED',
@@ -393,7 +395,7 @@ class WebhookController {
       }
       if (['createdAt', 'updatedAt'].indexOf(key) !== -1) result[key] = formatDateForMailchimp(result[key]);
     });
-    console.log(JSON.stringify(result));
+    logger.log(JSON.stringify(result));
     return result;
   }
   private async getSegment(
@@ -460,7 +462,7 @@ class WebhookController {
           audienceName: variables.audienceName,
         });
       } catch (error) {
-        console.log(error);
+        logger.log(error);
       }
     }
 

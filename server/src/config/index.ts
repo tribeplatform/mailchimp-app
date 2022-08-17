@@ -1,6 +1,3 @@
-import { config } from 'dotenv';
-config({ path: `.env` });
-
 export const CREDENTIALS = process.env.CREDENTIALS === 'true';
 export const {
   NODE_ENV,
@@ -12,10 +9,11 @@ export const {
   NETWORK_ID,
   MEMBER_ID,
   GRAPHQL_URL,
-  LOG_FORMAT,
+  LOG_FORMAT = 'info',
   LOG_DIR = '../logs',
   ORIGIN,
   MAILCHIMP_CLIENT_ID,
   MAILCHIMP_CLIENT_SECRET,
-  SERVER_URL
+  SERVER_URL,
+  LOGGER_PRETTY_PRINT,
 } = process.env;
