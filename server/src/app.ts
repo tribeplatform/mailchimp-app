@@ -63,7 +63,6 @@ class App {
   }
 
   private initializeMiddlewares() {
-    this.app.use(morgan(LOG_FORMAT, { stream }));
     this.app.use(cors({ origin: ORIGIN, credentials: CREDENTIALS }));
     this.app.use(express.static(path.join(__dirname, 'public')));
     this.app.use(
