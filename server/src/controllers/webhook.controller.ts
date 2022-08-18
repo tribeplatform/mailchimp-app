@@ -320,7 +320,7 @@ class WebhookController {
         await this.sendEvent(input?.data?.name, data, audienceId, tribeClient, mailchimpService, mailchimpConnection);
       }
     } catch (err) {
-      logger.log(err);
+      logger.error(err);
       return {
         type: input.type,
         status: 'FALIED',
@@ -462,7 +462,7 @@ class WebhookController {
           audienceName: variables.audienceName,
         });
       } catch (error) {
-        logger.log(error);
+        logger.error(error);
       }
     }
 
