@@ -7,6 +7,8 @@ const validateEnv = () => {
     CLIENT_ID: str(),
     CLIENT_SECRET: str(),
     SIGNING_SECRET: str(),
+    MAILCHIMP_CLIENT_ID: str(),
+    MAILCHIMP_CLIENT_SECRET: str(),
   });
 };
 
