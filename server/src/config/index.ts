@@ -6,8 +6,6 @@ export const {
   CLIENT_ID,
   CLIENT_SECRET,
   SIGNING_SECRET,
-  NETWORK_ID,
-  MEMBER_ID,
   GRAPHQL_URL,
   LOG_FORMAT = 'info',
   LOG_DIR = '../logs',
