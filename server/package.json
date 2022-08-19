@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@mailchimp/mailchimp_marketing": "^3.0.75",
-    "@tribeplatform/gql-client": "^1.1.2",
+    "@tribeplatform/gql-client": "^1.6.0",
     "@tribeplatform/node-logger": "^1.0.0",
     "@tribeplatform/slate-kit": "^1.0.7",
     "@types/passport": "^1.0.7",
@@ -27,6 +27,7 @@
     "cookie-parser": "^1.4.5",
     "cors": "^2.8.5",
     "dayjs": "^1.11.2",
+    "dd-trace": "^3.0.0",
     "dotenv": "^10.0.0",
     "envalid": "^7.1.0",
     "express": "^4.17.1",
