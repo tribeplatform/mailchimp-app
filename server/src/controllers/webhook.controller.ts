@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 
 import { GlobalClient, TribeClient, Types } from '@tribeplatform/gql-client';
 import { createLogger } from '@/utils/logger';
-
+import { v4 } from 'uuid';
 import { LiquidConvertor } from '@tribeplatform/slate-kit/convertors';
 import { CLIENT_ID, CLIENT_SECRET, GRAPHQL_URL, SERVER_URL } from '@/config';
 import auth from '@/utils/auth';
@@ -13,7 +13,7 @@ import { Member, Space } from '@tribeplatform/gql-client/types';
 import { formatDateForMailchimp } from '@utils/util';
 import { Mailchimp as MailchimpConnection } from '@/interfaces/mailchimp.interface';
 
-const logger  = createLogger('WebhookController')
+const logger = createLogger('WebhookController');
 
 const DEFAULT_SETTINGS = {};
 const SETTINGS_BLOCK = `
@@ -171,6 +171,14 @@ class WebhookController {
         case 'Callback':
           result = await this.handleCallback(input);
           break;
+        case 'Interaction':
+          const { callbackId } = input.data || {};
+          if (callbackId) {
+            result = await this.handleCalbackInteraction(input);
+          } else {
+            result = await this.loadBlockInteraction(input);
+          }
+          break;
         case 'SUBSCRIPTION':
           result = await this.handleSubscription(input);
           break;
@@ -299,7 +307,7 @@ class WebhookController {
           );
           if (spaces && spaces?.nodes?.length) {
             try {
-              for (let node of spaces?.nodes) {
+              for (const node of spaces?.nodes) {
                 const spaceId = node?.space?.id;
                 segment = await this.getSegment(mailchimpService, { networkId, spaceId, audienceId });
                 if (!segment && node?.space?.name) {
@@ -348,7 +356,7 @@ class WebhookController {
     const eventsList = ['space_membership.created', 'space_membership.deleted', 'space.created', 'post.published', 'reaction.added', 'tag.added'];
     const { shortDescription, actor, time } = data as { shortDescription: string; actor: Types.Member; time: string };
     if (shortDescription && actor.id && eventsList.indexOf(event) !== -1) {
-      let member = (await tribeClient.members.get({ id: actor?.id }, 'basic')) as Types.Member;
+      const member = (await tribeClient.members.get({ id: actor?.id }, 'basic')) as Types.Member;
       await this.addOrUpdateMember(member, audienceId, mailchimpService, mailchimpConnection);
       await mailchimpService.list(audienceId).addEvent({
         name: shortDescription,
@@ -359,7 +367,7 @@ class WebhookController {
     }
   }
   private async addOrUpdateMember(member: Member, audienceId: string, mailchimpService: MailchimpService, mailchimpConnection: MailchimpConnection) {
-    let mailchimpMember = await this.getMember(mailchimpService, { email: member?.email, audienceId });
+    const mailchimpMember = await this.getMember(mailchimpService, { email: member?.email, audienceId });
     if (!mailchimpMember) {
       await mailchimpService.list(audienceId).addMember(member as any);
     } else if (mailchimpConnection.sendName) {
@@ -440,7 +448,7 @@ class WebhookController {
     const network = await tribeClient.network.get('basic');
     const convertor = new LiquidConvertor(SETTINGS_BLOCK);
     const mailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
-    let variables = {
+    const variables = {
       settings: JSON.stringify({}),
       jwt: auth.sign({ networkId, memberId: actorId }),
       network,
@@ -452,7 +460,7 @@ class WebhookController {
         const { lists } = await mailchimpService.lists.list();
         variables.lists = lists;
         if (mailchimpConnection.audienceId) {
-          let audienceName = lists.find(list => list.id === mailchimpConnection.audienceId);
+          const audienceName = lists.find(list => list.id === mailchimpConnection.audienceId);
           if (audienceName) {
             variables.audienceName = audienceName.name;
           }
@@ -475,6 +483,63 @@ class WebhookController {
       data: { slate },
     };
   }
+  private async loadBlockInteraction(input) {
+    const {
+      networkId,
+      data: { actorId, interactionId },
+    } = input;
+    const tribeClient = await new GlobalClient({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      graphqlUrl: GRAPHQL_URL,
+    }).getTribeClient({ networkId });
+    const network = await tribeClient.network.get('basic');
+    const convertor = new LiquidConvertor(SETTINGS_BLOCK);
+    const mailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
+    const variables = {
+      settings: JSON.stringify({}),
+      jwt: auth.sign({ networkId, memberId: actorId }),
+      network,
+      mailchimp: mailchimpConnection,
+    } as any;
+    if (mailchimpConnection) {
+      const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
+      try {
+        const { lists } = await mailchimpService.lists.list();
+        variables.lists = lists;
+        if (mailchimpConnection.audienceId) {
+          const audienceName = lists.find(list => list.id === mailchimpConnection.audienceId);
+          if (audienceName) {
+            variables.audienceName = audienceName.name;
+          }
+        }
+        variables.settings = JSON.stringify({
+          ...mailchimpConnection,
+          audienceName: variables.audienceName,
+        });
+      } catch (error) {
+        logger.error(error);
+      }
+    }
+
+    const slate = await convertor.toSlate({
+      variables,
+    });
+    return {
+      type: input.type,
+      status: 'SUCCEEDED',
+      data: {
+        slate,
+        interactions: [
+          {
+            id: interactionId,
+            type: 'SHOW',
+            slate: slate,
+          },
+        ],
+      },
+    };
+  }
 
   /**
    *
@@ -487,10 +552,10 @@ class WebhookController {
       networkId,
       data: { callbackId, inputs = {} },
     } = input;
-    let settings: any = {};
+    const settings: any = {};
     if (['save-audience', 'save'].indexOf(callbackId) !== -1) {
       const mailchimpConnection = await MailchimpModel.findOne({ networkId });
-      let fields = ['audienceId', 'segmentPrefix', 'sendName', 'sendEvents'];
+      const fields = ['audienceId', 'segmentPrefix', 'sendName', 'sendEvents'];
       fields.forEach(field => {
         if (typeof inputs[field] !== 'undefined') mailchimpConnection[field] = inputs[field];
       });
@@ -508,6 +573,55 @@ class WebhookController {
             status: 'SUCCESS',
           },
           toStore: { settings },
+        },
+      };
+    }
+    const result = await this.loadBlock(input, settings);
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        action: 'REPLACE',
+        toStore: { settings },
+      },
+    };
+  }
+  private async handleCalbackInteraction(input) {
+    const {
+      networkId,
+      data: { callbackId, inputs = {}, interactionId },
+    } = input;
+    const settings: any = {};
+    if (['save-audience', 'save'].indexOf(callbackId) !== -1) {
+      const mailchimpConnection = await MailchimpModel.findOne({ networkId });
+      const fields = ['audienceId', 'segmentPrefix', 'sendName', 'sendEvents'];
+      fields.forEach(field => {
+        if (typeof inputs[field] !== 'undefined') mailchimpConnection[field] = inputs[field];
+      });
+      await mailchimpConnection.save();
+      const result = await this.loadBlock(input, settings);
+      const toastMessage =
+        callbackId === 'save-audience' ? 'Mailchimp has successfully been setup.' : 'Mailchimp connection has been successfully updated.';
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          toStore: { settings },
+          interactions: [
+            {
+              id: interactionId,
+              type: 'SHOW',
+              slate: result.data.slate,
+            },
+            {
+              id: v4(),
+              type: 'OPEN_TOAST',
+              props: {
+                status: 'SUCCESS',
+                title: toastMessage,
+              },
+            },
+          ],
         },
       };
     }
