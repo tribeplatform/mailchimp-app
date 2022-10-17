@@ -12,6 +12,9 @@ import SegmentModel from '@/models/segments.model';
 import { Member, Space } from '@tribeplatform/gql-client/types';
 import { formatDateForMailchimp } from '@utils/util';
 import { Mailchimp as MailchimpConnection } from '@/interfaces/mailchimp.interface';
+import { WEBHOOK_ACTION } from '@/enums/webhookActions.enums';
+import { WebhookResponseStatus } from '@/enums/response.enum';
+import { AppInteractionType } from '@/enums/interactionTypes.enum';
 
 const logger = createLogger('WebhookController');
 
@@ -599,13 +602,13 @@ class WebhookController {
         if (typeof inputs[field] !== 'undefined') mailchimpConnection[field] = inputs[field];
       });
       await mailchimpConnection.save();
-      const result = await this.loadBlock(input, settings);
+      const result = await this.loadBlockInteraction(input);
       const toastMessage =
         callbackId === 'save-audience' ? 'Mailchimp has successfully been setup.' : 'Mailchimp connection has been successfully updated.';
       return {
-        ...result,
+        type: WEBHOOK_ACTION.INTERACTION,
+        status: WebhookResponseStatus.SUCCEEDED,
         data: {
-          ...result.data,
           toStore: { settings },
           interactions: [
             {
@@ -625,12 +628,18 @@ class WebhookController {
         },
       };
     }
-    const result = await this.loadBlock(input, settings);
+    const result = await this.loadBlockInteraction(input);
     return {
-      ...result,
+      type: WEBHOOK_ACTION.INTERACTION,
+      status: WebhookResponseStatus.SUCCEEDED,
       data: {
-        ...result.data,
-        action: 'REPLACE',
+        interactions: [
+          {
+            id: interactionId,
+            type: AppInteractionType.Show,
+            slate: result.data.slate,
+          },
+        ],
         toStore: { settings },
       },
     };
