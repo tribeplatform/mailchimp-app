@@ -1944,10 +1944,10 @@
     logform "^2.4.2"
     winston "^3.8.1"
 
-"@tribeplatform/slate-kit@^1.0.7":
-  version "1.0.7"
-  resolved "https://registry.yarnpkg.com/@tribeplatform/slate-kit/-/slate-kit-1.0.7.tgz#f5bf3b174db0f3463b10226698d03e6971a5d69b"
-  integrity sha512-TkKCC9mPhMYgkXkh0kUDzHO7e+Av77beQ+ZX6ne8W4d8tFgoJlOyHOr6LXNKi/NrQDiGLp2+zjtoNjsNr6iPaA==
+"@tribeplatform/slate-kit@^1.2.3":
+  version "1.2.3"
+  resolved "https://registry.yarnpkg.com/@tribeplatform/slate-kit/-/slate-kit-1.2.3.tgz#e51e0716ab57e5c0c77a9689c93dcaf542a5b681"
+  integrity sha512-hyVjYy5aMlu9ErHxFvOIT7LHY0ccjjKHa2Cjji/J+VThl+0UvWqGLOB1sevwpInOCd1AZokpt55qL/fuGrW8hA==
   dependencies:
     class-transformer "^0.5.1"
     class-validator "^0.13.1"
@@ -2420,6 +2420,11 @@
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/@types/trusted-types/-/trusted-types-2.0.2.tgz#fc25ad9943bcac11cceb8168db4f275e0e72e756"
   integrity sha512-F5DIZ36YVLE+PN+Zwws4kJogq47hNgX3Nx6WyDJ3kcplxyke3XIzB8uK5n/Lpm1HBsbGzd6nmGehL8cPekP+Tg==
+
+"@types/uuid@^8.3.4":
+  version "8.3.4"
+  resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.4.tgz#bd86a43617df0594787d38b735f55c805becf1bc"
+  integrity sha512-c/I8ZRb51j+pYGAu5CrFMRxqZ2ke4y2grEBO5AUjgSkSk+qT2Ea+OdWElz/OiMf5MNpn2b17kuVBwZLQJXzihw==
 
 "@types/webidl-conversions@*":
   version "6.1.1"
@@ -11068,6 +11073,11 @@ uuid@^8.3.2:
   version "8.3.2"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-8.3.2.tgz#80d5b5ced271bb9af6c445f21a1a04c606cefbe2"
   integrity sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==
+
+uuid@^9.0.0:
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-9.0.0.tgz#592f550650024a38ceb0c562f2f6aa435761efb5"
+  integrity sha512-MXcSTerfPa4uqyzStbRoTgt5XIe3x5+42+q1sDuy3R5MDk66URdLMOZe5aPX/SQd+kuYAh0FdP/pO28IkQyTeg==
 
 v8-compile-cache-lib@^3.0.1:
   version "3.0.1"
