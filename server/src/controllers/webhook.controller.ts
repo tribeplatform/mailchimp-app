@@ -532,7 +532,6 @@ class WebhookController {
       type: input.type,
       status: 'SUCCEEDED',
       data: {
-        slate,
         interactions: [
           {
             id: interactionId,
@@ -637,7 +636,7 @@ class WebhookController {
           {
             id: interactionId,
             type: AppInteractionType.Show,
-            slate: result.data.slate,
+            slate: result.data.interactions[0].slate,
           },
         ],
         toStore: { settings },
