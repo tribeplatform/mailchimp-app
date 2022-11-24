@@ -613,7 +613,7 @@ class WebhookController {
             {
               id: interactionId,
               type: 'SHOW',
-              slate: result.data.slate,
+              slate: result.data.interactions[0].slate,
             },
             {
               id: v4(),
