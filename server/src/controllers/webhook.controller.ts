@@ -174,10 +174,10 @@ class WebhookController {
         case 'Callback':
           result = await this.handleCallback(input);
           break;
-        case 'Interaction':
+        case 'INTERACTION':
           const { callbackId } = input.data || {};
           if (callbackId) {
-            result = await this.handleCalbackInteraction(input);
+            result = await this.handleCallbackInteraction(input);
           } else {
             result = await this.loadBlockInteraction(input);
           }
@@ -588,7 +588,7 @@ class WebhookController {
       },
     };
   }
-  private async handleCalbackInteraction(input) {
+  private async handleCallbackInteraction(input) {
     const {
       networkId,
       data: { callbackId, inputs = {}, interactionId },
