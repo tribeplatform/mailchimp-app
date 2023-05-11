@@ -130,7 +130,7 @@ const SETTINGS_BLOCK = `
             status="warning"
             title="You need to authenticate Mailchimp to activate this integration"
             />
-            <Button as="a" href="{{connectUrl}}" variant="primary" className="pointer-events-auto">
+            <Button as="a" href="{{connectUrl}}" variant="primary">
               Connect Mailchimp
             </Button>
         </List>
