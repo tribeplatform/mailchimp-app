@@ -34,7 +34,7 @@ const SETTINGS_BLOCK = `
 ]
 {% endcapture %}
 
-{% capture connectUrl %}${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/apps/mailchimp{% endcapture %}
+{% capture connectUrl %}${SERVER_URL}/api/mailchimp/auth?jwt={{jwt}}&redirect=https://{{network.domain}}/manage/app-store/apps/kwrNURPZ0l0w{% endcapture %}
 
 {% if mailchimp != blank and mailchimp.audienceId == blank %}
   {%- assign callbackId = "save-audience" -%}
