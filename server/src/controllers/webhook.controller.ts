@@ -130,7 +130,7 @@ const SETTINGS_BLOCK = `
             status="warning"
             title="You need to authenticate Mailchimp to activate this integration"
             />
-            <Button as="a" href="{{connectUrl}}" variant="primary" className="pointer-events-auto">
+            <Button as="a" href="{{connectUrl}}" variant="primary" autoDisabled="false">
               Connect Mailchimp
             </Button>
         </List>
@@ -174,10 +174,10 @@ class WebhookController {
         case 'Callback':
           result = await this.handleCallback(input);
           break;
-        case 'Interaction':
+        case 'INTERACTION':
           const { callbackId } = input.data || {};
           if (callbackId) {
-            result = await this.handleCalbackInteraction(input);
+            result = await this.handleCallbackInteraction(input);
           } else {
             result = await this.loadBlockInteraction(input);
           }
@@ -532,7 +532,6 @@ class WebhookController {
       type: input.type,
       status: 'SUCCEEDED',
       data: {
-        slate,
         interactions: [
           {
             id: interactionId,
@@ -589,7 +588,7 @@ class WebhookController {
       },
     };
   }
-  private async handleCalbackInteraction(input) {
+  private async handleCallbackInteraction(input) {
     const {
       networkId,
       data: { callbackId, inputs = {}, interactionId },
@@ -614,7 +613,7 @@ class WebhookController {
             {
               id: interactionId,
               type: 'SHOW',
-              slate: result.data.slate,
+              slate: result.data.interactions[0].slate,
             },
             {
               id: v4(),
@@ -637,7 +636,7 @@ class WebhookController {
           {
             id: interactionId,
             type: AppInteractionType.Show,
-            slate: result.data.slate,
+            slate: result.data.interactions[0].slate,
           },
         ],
         toStore: { settings },
