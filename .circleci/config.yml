@@ -10,7 +10,6 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: default
       - run:
           name: "Build and deploy docker image"
           command: |
