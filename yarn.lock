@@ -1925,10 +1925,10 @@
   resolved "https://registry.yarnpkg.com/@tootallnate/once/-/once-1.1.2.tgz#ccb91445360179a04e7fe6aff78c00ffc1eeaf82"
   integrity sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==
 
-"@tribeplatform/gql-client@^1.6.0":
-  version "1.6.0"
-  resolved "https://registry.yarnpkg.com/@tribeplatform/gql-client/-/gql-client-1.6.0.tgz#5a258dff28596a93adfaec7a21cd4c859c19f346"
-  integrity sha512-AsdhgPAY56ydV957sLZmhwkm7gciDtBfh04NPE6N7mxXdGKZ9ym1TSU0VTH5SXGnFXweF61Yg+NQ2U/mgZB1Zw==
+"@tribeplatform/gql-client@2.3.5":
+  version "2.3.5"
+  resolved "https://registry.yarnpkg.com/@tribeplatform/gql-client/-/gql-client-2.3.5.tgz#5fc2467d354f4b3786fad6f920737c27166c527c"
+  integrity sha512-KEa1hXsudET2qYktiRc2NRHPLkf1gLrBipt7ffY46JEIhylnbk1HJzA4rBV4Sg6NmqlR+cQPGr2Zi6Mg4wrG4Q==
   dependencies:
     graphql "^15.5.1"
     graphql-request "^4.2.0"
