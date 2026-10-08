@@ -140,6 +140,33 @@ const SETTINGS_BLOCK = `
 </Form>
 `;
 
+/**
+ * Connection fields the settings block template reads via `mailchimp.*`.
+ * Never includes credentials (accessToken) or account internals.
+ */
+export const toPublicConnection = (connection: MailchimpConnection | null) => {
+  if (!connection) return null;
+  return {
+    networkId: connection.networkId,
+    name: connection.name,
+    audienceId: connection.audienceId,
+    segmentPrefix: connection.segmentPrefix,
+    sendEvents: connection.sendEvents,
+    sendName: connection.sendName,
+  };
+};
+
+/**
+ * Default values for the settings form: only the fields the form renders.
+ */
+export const toSettingsFormValues = (connection: MailchimpConnection, audienceName?: string) => ({
+  audienceId: connection.audienceId,
+  segmentPrefix: connection.segmentPrefix,
+  sendName: connection.sendName,
+  sendEvents: connection.sendEvents,
+  audienceName,
+});
+
 class WebhookController {
   public index = async (req: Request, res: Response, next: NextFunction) => {
     const input = req.body;
@@ -432,6 +459,38 @@ class WebhookController {
   }
 
   /**
+   * Builds the liquid variables for the settings block.
+   * Only non-secret connection fields are exposed: the block is rendered to the
+   * browser and its form values are posted back in interaction payloads.
+   */
+  private async getSettingsBlockVariables({ networkId, actorId, network }: { networkId: string; actorId: string; network: any }) {
+    const mailchimpConnection: MailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
+    const variables = {
+      settings: JSON.stringify({}),
+      jwt: auth.sign({ networkId, memberId: actorId }),
+      network,
+      mailchimp: toPublicConnection(mailchimpConnection),
+    } as any;
+    if (mailchimpConnection) {
+      const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
+      try {
+        const { lists } = await mailchimpService.lists.list();
+        variables.lists = lists;
+        if (mailchimpConnection.audienceId) {
+          const audienceName = lists.find(list => list.id === mailchimpConnection.audienceId);
+          if (audienceName) {
+            variables.audienceName = audienceName.name;
+          }
+        }
+        variables.settings = JSON.stringify(toSettingsFormValues(mailchimpConnection, variables.audienceName));
+      } catch (error) {
+        logger.error(error);
+      }
+    }
+    return variables;
+  }
+
+  /**
    *
    * @param input
    * @returns { type: input.type, status: 'SUCCEEDED', data: {} }
@@ -450,32 +509,7 @@ class WebhookController {
     }).getTribeClient({ networkId });
     const network = await tribeClient.network.get('basic');
     const convertor = new LiquidConvertor(SETTINGS_BLOCK);
-    const mailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
-    const variables = {
-      settings: JSON.stringify({}),
-      jwt: auth.sign({ networkId, memberId: actorId }),
-      network,
-      mailchimp: mailchimpConnection,
-    } as any;
-    if (mailchimpConnection) {
-      const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
-      try {
-        const { lists } = await mailchimpService.lists.list();
-        variables.lists = lists;
-        if (mailchimpConnection.audienceId) {
-          const audienceName = lists.find(list => list.id === mailchimpConnection.audienceId);
-          if (audienceName) {
-            variables.audienceName = audienceName.name;
-          }
-        }
-        variables.settings = JSON.stringify({
-          ...mailchimpConnection,
-          audienceName: variables.audienceName,
-        });
-      } catch (error) {
-        logger.error(error);
-      }
-    }
+    const variables = await this.getSettingsBlockVariables({ networkId, actorId, network });
 
     const slate = await convertor.toSlate({
       variables,
@@ -498,32 +532,7 @@ class WebhookController {
     }).getTribeClient({ networkId });
     const network = await tribeClient.network.get('basic');
     const convertor = new LiquidConvertor(SETTINGS_BLOCK);
-    const mailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
-    const variables = {
-      settings: JSON.stringify({}),
-      jwt: auth.sign({ networkId, memberId: actorId }),
-      network,
-      mailchimp: mailchimpConnection,
-    } as any;
-    if (mailchimpConnection) {
-      const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
-      try {
-        const { lists } = await mailchimpService.lists.list();
-        variables.lists = lists;
-        if (mailchimpConnection.audienceId) {
-          const audienceName = lists.find(list => list.id === mailchimpConnection.audienceId);
-          if (audienceName) {
-            variables.audienceName = audienceName.name;
-          }
-        }
-        variables.settings = JSON.stringify({
-          ...mailchimpConnection,
-          audienceName: variables.audienceName,
-        });
-      } catch (error) {
-        logger.error(error);
-      }
-    }
+    const variables = await this.getSettingsBlockVariables({ networkId, actorId, network });
 
     const slate = await convertor.toSlate({
       variables,
