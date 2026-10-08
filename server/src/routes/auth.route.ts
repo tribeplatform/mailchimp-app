@@ -15,7 +15,12 @@ class AuthRoute implements Routes {
   private initializeRoutes() {
     this.router.get(`${this.path}/auth`, this.authController.auth);
     this.router.get(`${this.path}/auth/callback/failure`, this.authController.authFailure);
-    this.router.get(`${this.path}/auth/callback`, passport.authorize('mailchimp', { failureRedirect: `${this.path}/auth/callback/failure` }), this.authController.authCallback);
+    this.router.get(
+      `${this.path}/auth/callback`,
+      this.authController.verifyCallbackState,
+      passport.authorize('mailchimp', { failureRedirect: `${this.path}/auth/callback/failure` }),
+      this.authController.authCallback,
+    );
   }
 }
 
