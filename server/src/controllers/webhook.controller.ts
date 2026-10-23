@@ -15,6 +15,8 @@ import { Mailchimp as MailchimpConnection } from '@/interfaces/mailchimp.interfa
 import { WEBHOOK_ACTION } from '@/enums/webhookActions.enums';
 import { WebhookResponseStatus } from '@/enums/response.enum';
 import { AppInteractionType } from '@/enums/interactionTypes.enum';
+import { getTribeClient } from '@/utils/tribe_client';
+import { isMailchimpNotFound } from '@/utils/mailchimpErrors';
 
 const logger = createLogger('WebhookController');
 
@@ -252,11 +254,6 @@ class WebhookController {
       networkId,
       data: { object },
     } = input;
-    const tribeClient = await new GlobalClient({
-      clientId: CLIENT_ID,
-      clientSecret: CLIENT_SECRET,
-      graphqlUrl: GRAPHQL_URL,
-    }).getTribeClient({ networkId });
     const mailchimpConnection: MailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
     if (!mailchimpConnection || !mailchimpConnection.audienceId) {
       return {
@@ -265,6 +262,8 @@ class WebhookController {
         data: {},
       };
     }
+    // Only networks with a finished setup need a Bettermode client, and it is cached per network.
+    const tribeClient = await getTribeClient({ networkId });
     const audienceId = mailchimpConnection.audienceId;
     const segmentPrefix = mailchimpConnection.segmentPrefix;
     const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
@@ -418,6 +417,8 @@ class WebhookController {
       try {
         segment = await mailchimpService.list(audienceId).tags.get(segment.segmentId);
       } catch (err) {
+        // Only a deleted tag is recreated. On 403/429/5xx, creating it would fail too (and add to the load).
+        if (!isMailchimpNotFound(err)) throw err;
         segment = null;
       }
     }
@@ -427,6 +428,8 @@ class WebhookController {
     try {
       return await mailchimpService.list(audienceId).getMember({ email });
     } catch (err) {
+      // Only 404 means "not in the audience". Anything else stops this sync instead of piling on more calls.
+      if (!isMailchimpNotFound(err)) throw err;
       return null;
     }
   }
