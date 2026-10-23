@@ -8,5 +8,9 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': 'ts-jest',
   },
-  moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, { prefix: '<rootDir>/src' }),
+  moduleNameMapper: {
+    // jest 27 does not resolve package.json "exports" subpaths
+    '^@tribeplatform/slate-kit/convertors$': '<rootDir>/node_modules/@tribeplatform/slate-kit/dist/cjs/convertors/index.js',
+    ...pathsToModuleNameMapper(compilerOptions.paths, { prefix: '<rootDir>/src' }),
+  },
 };
