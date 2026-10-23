@@ -15,6 +15,7 @@ import { Mailchimp as MailchimpConnection } from '@/interfaces/mailchimp.interfa
 import { WEBHOOK_ACTION } from '@/enums/webhookActions.enums';
 import { WebhookResponseStatus } from '@/enums/response.enum';
 import { AppInteractionType } from '@/enums/interactionTypes.enum';
+import { isMailchimpNotFound } from '@/utils/mailchimpErrors';
 
 const logger = createLogger('WebhookController');
 
@@ -418,6 +419,8 @@ class WebhookController {
       try {
         segment = await mailchimpService.list(audienceId).tags.get(segment.segmentId);
       } catch (err) {
+        // Only a deleted tag is recreated. On 403/429/5xx, creating it would fail too (and add to the load).
+        if (!isMailchimpNotFound(err)) throw err;
         segment = null;
       }
     }
@@ -427,6 +430,8 @@ class WebhookController {
     try {
       return await mailchimpService.list(audienceId).getMember({ email });
     } catch (err) {
+      // Only 404 means "not in the audience". Anything else stops this sync instead of piling on more calls.
+      if (!isMailchimpNotFound(err)) throw err;
       return null;
     }
   }
