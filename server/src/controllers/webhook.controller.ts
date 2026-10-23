@@ -191,12 +191,14 @@ class WebhookController {
       }
       res.status(200).json(result);
     } catch (error) {
+      logger.error(`Webhook ${input?.type} for network ${input?.networkId} failed`);
       logger.error(error);
-      return {
-        type: input.type,
-        status: 'FAILED',
+      // Always answer, otherwise the request stays open until Bettermode times out.
+      return res.status(200).json({
+        type: input?.type,
+        status: WebhookResponseStatus.FAILED,
         data: {},
-      };
+      });
     }
   };
 
@@ -334,7 +336,7 @@ class WebhookController {
       logger.error(err);
       return {
         type: input.type,
-        status: 'FALIED',
+        status: WebhookResponseStatus.FAILED,
         data: {},
       };
     }
@@ -358,7 +360,8 @@ class WebhookController {
   ) {
     const eventsList = ['space_membership.created', 'space_membership.deleted', 'space.created', 'post.published', 'reaction.added', 'tag.added'];
     const { shortDescription, actor, time } = data as { shortDescription: string; actor: Types.Member; time: string };
-    if (shortDescription && actor.id && eventsList.indexOf(event) !== -1) {
+    // Some events (e.g. system or scheduled ones) have no actor.
+    if (shortDescription && actor?.id && eventsList.indexOf(event) !== -1) {
       const member = (await tribeClient.members.get({ id: actor?.id }, 'basic')) as Types.Member;
       await this.addOrUpdateMember(member, audienceId, mailchimpService, mailchimpConnection);
       await mailchimpService.list(audienceId).addEvent({
