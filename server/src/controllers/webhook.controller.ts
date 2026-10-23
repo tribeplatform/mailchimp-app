@@ -15,6 +15,7 @@ import { Mailchimp as MailchimpConnection } from '@/interfaces/mailchimp.interfa
 import { WEBHOOK_ACTION } from '@/enums/webhookActions.enums';
 import { WebhookResponseStatus } from '@/enums/response.enum';
 import { AppInteractionType } from '@/enums/interactionTypes.enum';
+import { getTribeClient } from '@/utils/tribe_client';
 import { isMailchimpNotFound } from '@/utils/mailchimpErrors';
 
 const logger = createLogger('WebhookController');
@@ -253,11 +254,6 @@ class WebhookController {
       networkId,
       data: { object },
     } = input;
-    const tribeClient = await new GlobalClient({
-      clientId: CLIENT_ID,
-      clientSecret: CLIENT_SECRET,
-      graphqlUrl: GRAPHQL_URL,
-    }).getTribeClient({ networkId });
     const mailchimpConnection: MailchimpConnection = await MailchimpModel.findOne({ networkId }).lean();
     if (!mailchimpConnection || !mailchimpConnection.audienceId) {
       return {
@@ -266,6 +262,8 @@ class WebhookController {
         data: {},
       };
     }
+    // Only networks with a finished setup need a Bettermode client, and it is cached per network.
+    const tribeClient = await getTribeClient({ networkId });
     const audienceId = mailchimpConnection.audienceId;
     const segmentPrefix = mailchimpConnection.segmentPrefix;
     const mailchimpService = new MailchimpService(mailchimpConnection.accessToken, mailchimpConnection.apiEndpoint);
