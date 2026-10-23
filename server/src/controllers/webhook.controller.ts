@@ -158,7 +158,8 @@ class WebhookController {
         status: 'SUCCEEDED',
         data: {},
       };
-      logger.log(JSON.stringify(input));
+      // The payload carries member emails, IPs and post content: log only what identifies the delivery.
+      logger.debug(`Webhook ${input.type}${input.data?.name ? ` ${input.data.name}` : ''} for network ${input.networkId}`);
 
       switch (input.type) {
         case 'GET_SETTINGS':
@@ -333,6 +334,7 @@ class WebhookController {
         await this.sendEvent(input?.data?.name, data, audienceId, tribeClient, mailchimpService, mailchimpConnection);
       }
     } catch (err) {
+      logger.error(`Mailchimp sync of ${input?.data?.name} for network ${networkId} failed`);
       logger.error(err);
       return {
         type: input.type,
@@ -409,7 +411,6 @@ class WebhookController {
       }
       if (['createdAt', 'updatedAt'].indexOf(key) !== -1) result[key] = formatDateForMailchimp(result[key]);
     });
-    logger.log(JSON.stringify(result));
     return result;
   }
   private async getSegment(
