@@ -1,4 +1,5 @@
 import { RequestParam } from '../mailchimp.services';
+import { mailchimpErrorStatus } from '@/utils/mailchimpErrors';
 
 class TagsService {
   list: string;
@@ -13,15 +14,34 @@ public get(id: string) {
       url: `/lists/${this.list}/segments/${id}`,
     });
   }
+  /**
+   * Creates the tag. If Mailchimp says it already exists (400), returns the existing tag instead:
+   * the stored mapping can be missing (e.g. after a reinstall) while the tag is still in the audience.
+   */
   public async create({ name }: { name: string }) {
-    return this.request({
-      method: 'POST',
-      url: `/lists/${this.list}/segments`,
-      data: {
-        name,
-        static_segment: [],
-      },
+    try {
+      return await this.request({
+        method: 'POST',
+        url: `/lists/${this.list}/segments`,
+        data: {
+          name,
+          static_segment: [],
+        },
+      });
+    } catch (err) {
+      if (mailchimpErrorStatus(err) !== 400) throw err;
+      const existing = await this.findByName(name);
+      if (!existing) throw err;
+      return existing;
+    }
+  }
+  public async findByName(name: string) {
+    const result = await this.request({
+      method: 'GET',
+      url: `/lists/${this.list}/segments?type=static&count=1000&fields=segments.id,segments.name`,
     });
+    const wanted = String(name).trim().toLowerCase();
+    return (result?.segments || []).find(segment => String(segment.name).trim().toLowerCase() === wanted) || null;
   }
   public update(id: string, { name }: { name: string }) {
     return this.request({
